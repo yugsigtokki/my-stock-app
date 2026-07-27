@@ -3,9 +3,6 @@ import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import urllib.request
-import urllib.parse
-import xml.etree.ElementTree as ET
 
 # -----------------------------------------------------------------------------
 # 1. 레이아웃 & CSS 설정
@@ -25,52 +22,19 @@ st.markdown("""
         max-width: 100% !important;
     }
     
-    /* 사이드바 스타일링 */
     [data-testid="stSidebar"] {
         background-color: #1C1C1E !important;
     }
     
-    /* 신호 카드 스타일 */
-    .card-buy {
-        background-color: rgba(240, 68, 82, 0.15);
-        border: 2px solid #F04452;
-        padding: 20px;
-        border-radius: 16px;
-        margin-bottom: 15px;
-    }
-    .card-weak-buy {
-        background-color: rgba(255, 126, 54, 0.15);
-        border: 2px solid #FF7E36;
-        padding: 20px;
-        border-radius: 16px;
-        margin-bottom: 15px;
-    }
-    .card-hold {
-        background-color: #1C1C1E;
-        border: 1px solid #2C2C2E;
-        padding: 20px;
-        border-radius: 16px;
-        margin-bottom: 15px;
-    }
-    .card-sell {
-        background-color: rgba(49, 130, 246, 0.15);
-        border: 2px solid #3182F6;
-        padding: 20px;
-        border-radius: 16px;
-        margin-bottom: 15px;
-    }
-    .news-card {
-        background-color: #1C1C1E;
-        padding: 14px 18px;
-        border-radius: 12px;
-        margin-bottom: 10px;
-        border: 1px solid #2C2C2E;
-    }
+    .card-buy { background-color: rgba(240, 68, 82, 0.15); border: 2px solid #F04452; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
+    .card-weak-buy { background-color: rgba(255, 126, 54, 0.15); border: 2px solid #FF7E36; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
+    .card-hold { background-color: #1C1C1E; border: 1px solid #2C2C2E; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
+    .card-sell { background-color: rgba(49, 130, 246, 0.15); border: 2px solid #3182F6; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. 데이터 수집 및 AI 분석 엔진 (공통 함수)
+# 2. 데이터 수집 및 AI 분석 엔진
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=10)
 def fetch_data(symbol, interval, period):
@@ -121,14 +85,10 @@ def get_ai_analysis(df, mode):
     reasons = []
 
     if "중장기" in mode or "스윙" in mode:
-        if not pd.isna(sma200) and sma50 > sma200:
-            score += 3; reasons.append("정배열 (50일선 > 200일선)")
-        else:
-            score -= 3; reasons.append("역배열 (50일선 < 200일선)")
-        if curr_price > sma50:
-            score += 2; reasons.append("50일 지지선 상회")
-        else:
-            score -= 2; reasons.append("50일 지지선 이탈")
+        if not pd.isna(sma200) and sma50 > sma200: score += 3; reasons.append("정배열 (50일선 > 200일선)")
+        else: score -= 3; reasons.append("역배열 (50일선 < 200일선)")
+        if curr_price > sma50: score += 2; reasons.append("50일 지지선 상회")
+        else: score -= 2; reasons.append("50일 지지선 이탈")
         if curr_macd_hist > 0: score += 2; reasons.append("MACD 모멘텀 강세")
         else: score -= 2; reasons.append("MACD 모멘텀 약세")
         if curr_rsi <= 40: score += 1; reasons.append(f"RSI 과매도 ({curr_rsi:.1f})")
@@ -152,62 +112,38 @@ with st.sidebar:
     st.markdown("## 🤖 메뉴")
     page = st.radio("이동할 창을 선택하세요:", ["🏠 홈 (AI 실시간 추천)", "🔍 개별 종목 검색"])
     st.markdown("---")
-    st.write("안전하고 성공적인 매매를 기원합니다!")
 
 # -----------------------------------------------------------------------------
 # 4. [페이지 1] AI 실시간 추천 홈
 # -----------------------------------------------------------------------------
 if page == "🏠 홈 (AI 실시간 추천)":
     st.title("🔥 AI 실시간 매매 시그널 보드")
-    st.write("한국/미국 주요 인기 종목들의 실시간 상태를 스캔하여 매수 타점이 온 종목을 알려줍니다.")
     
-    # 홈 화면용 모드 선택
     home_mode = st.radio("타임프레임 기준", ["⚡ 단타 (5분봉)", "📅 스윙 (일봉)"], horizontal=True)
     interval = "5m" if "단타" in home_mode else "1d"
     period = "5d" if "단타" in home_mode else "6mo"
     
-    # 확장된 관심 종목 리스트 (한국어 이름 매핑)
     target_stocks = {
-        "NVDA": "엔비디아 (NVDA)", 
-        "TSLA": "테슬라 (TSLA)", 
-        "AAPL": "애플 (AAPL)", 
-        "MSFT": "마이크로소프트 (MSFT)",
-        "AMZN": "아마존 (AMZN)",
-        "GOOGL": "구글 (GOOGL)",
-        "META": "메타 (META)",
-        "AMD": "AMD",
-        "PLTR": "팔란티어 (PLTR)",
-        "SOXL": "반도체 3X (SOXL)", 
-        "TQQQ": "나스닥 3X (TQQQ)", 
-        "TSLL": "테슬라 2X (TSLL)",
-        "005930.KS": "삼성전자", 
-        "000660.KS": "SK하이닉스",
-        "373220.KS": "LG에너지솔루션",
-        "005380.KS": "현대차",
-        "035420.KS": "NAVER"
+        "NVDA": "엔비디아", "TSLA": "테슬라", "AAPL": "애플", "MSFT": "마이크로소프트",
+        "SOXL": "반도체 3X", "TQQQ": "나스닥 3X", "TSLL": "테슬라 2X",
+        "005930.KS": "삼성전자", "000660.KS": "SK하이닉스", "373220.KS": "LG엔솔"
     }
     
     st.markdown("### 🏆 현재 추천 매수 종목")
-    
     col1, col2, col3 = st.columns(3)
     cols = [col1, col2, col3]
     col_idx = 0
-    
     no_buy_signals = True
     
-    # 모든 종목 스캔
     for ticker, name in target_stocks.items():
         df = fetch_data(ticker, interval, period)
         analysis = get_ai_analysis(df, home_mode)
         
         if analysis:
             score = analysis['score']
-            if score >= 1: # 약한 매수 이상만 홈 화면 상단에 표시
+            if score >= 1:
                 no_buy_signals = False
-                
-                # 한국 주식은 원화 기호(₩), 미국 주식은 달러 기호($) 표시
                 currency = "₩" if ".KS" in ticker else "$"
-                
                 with cols[col_idx % 3]:
                     if score >= 4:
                         st.markdown(f"""
@@ -215,7 +151,6 @@ if page == "🏠 홈 (AI 실시간 추천)":
                                 <h3 style="margin:0; color:#F04452;">{name}</h3>
                                 <h2 style="margin:5px 0 0 0;">{currency}{analysis['price']:,.2f}</h2>
                                 <p style="color:#F04452; font-weight:bold; margin:5px 0;">🔥 강력 매수 (+{score}점)</p>
-                                <span style="font-size:12px; color:#aaa;">{', '.join(analysis['reasons'][:2])}</span>
                             </div>
                         """, unsafe_allow_html=True)
                     else:
@@ -224,13 +159,12 @@ if page == "🏠 홈 (AI 실시간 추천)":
                                 <h3 style="margin:0; color:#FF7E36;">{name}</h3>
                                 <h2 style="margin:5px 0 0 0;">{currency}{analysis['price']:,.2f}</h2>
                                 <p style="color:#FF7E36; font-weight:bold; margin:5px 0;">📈 분할 매수 (+{score}점)</p>
-                                <span style="font-size:12px; color:#aaa;">{', '.join(analysis['reasons'][:2])}</span>
                             </div>
                         """, unsafe_allow_html=True)
                 col_idx += 1
                 
     if no_buy_signals:
-        st.info("현재 시장에 뚜렷한 매수 신호가 포착된 종목이 없습니다. 관망을 추천합니다.")
+        st.info("현재 뚜렷한 매수 신호가 포착된 종목이 없습니다.")
 
 # -----------------------------------------------------------------------------
 # 5. [페이지 2] 개별 종목 검색 및 차트 분석
@@ -242,26 +176,16 @@ elif page == "🔍 개별 종목 검색":
         st.session_state["current_symbol"] = "005930"
 
     col_search, col_mode = st.columns([1.5, 2])
-
     with col_search:
-        user_input = st.text_input(
-            "티커 입력 (예: TSLL, NVDA, AAPL, 005930, 000660)", 
-            value=st.session_state["current_symbol"]
-        ).strip().upper()
-        if user_input:
-            st.session_state["current_symbol"] = user_input
-
+        user_input = st.text_input("티커 또는 종목코드 입력 (예: NVDA, 005930)", value=st.session_state["current_symbol"]).strip().upper()
+        if user_input: st.session_state["current_symbol"] = user_input
     with col_mode:
-        trade_mode = st.radio(
-            "🎯 매매 전략 모드",
-            ["⚡ 초단타 (1분봉)", "🚀 추세 스윙 (5분봉)", "📅 중장기 예측 (일봉)"],
-            horizontal=True
-        )
+        trade_mode = st.radio("🎯 매매 전략 모드", ["⚡ 초단타 (1분봉)", "🚀 추세 스윙 (5분봉)", "📅 중장기 예측 (일봉)"], horizontal=True)
 
     stock_input = st.session_state["current_symbol"]
+    is_korean_stock = stock_input.isdigit() and len(stock_input) == 6
 
-    # 한국 주식 처리 (6자리 숫자)
-    if stock_input.isdigit() and len(stock_input) == 6:
+    if is_korean_stock:
         tv_symbol = f"KRX:{stock_input}"
         yf_symbol = f"{stock_input}.KS"
         currency = "₩"
@@ -272,12 +196,9 @@ elif page == "🔍 개별 종목 검색":
 
     st.markdown("---")
 
-    if "초단타" in trade_mode:
-        target_interval, target_period, tv_interval = "1m", "5d", "1"
-    elif "추세" in trade_mode:
-        target_interval, target_period, tv_interval = "5m", "1mo", "5"
-    else:
-        target_interval, target_period, tv_interval = "1d", "1y", "D"
+    if "초단타" in trade_mode: target_interval, target_period, tv_interval = "1m", "5d", "1"
+    elif "추세" in trade_mode: target_interval, target_period, tv_interval = "5m", "1mo", "5"
+    else: target_interval, target_period, tv_interval = "1d", "1y", "D"
 
     df = fetch_data(yf_symbol, target_interval, target_period)
     analysis = get_ai_analysis(df, trade_mode)
@@ -287,59 +208,45 @@ elif page == "🔍 개별 종목 검색":
         reasons_html = "<br>".join([f"• {r}" for r in analysis['reasons']])
 
         if score >= 4:
-            st.markdown(f"""
-                <div class="card-buy">
-                    <div style="color: #F04452; font-weight: 700;">🔥 종합점수: +{score}점 [강세 및 매수 추천]</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #F04452;">현재가: {currency}{analysis['price']:,.2f}</div>
-                    <div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="card-buy"><div style="color: #F04452; font-weight: 700;">🔥 종합점수: +{score}점 [강세 및 매수 추천]</div><div style="font-size: 24px; font-weight: 800; color: #F04452;">현재가: {currency}{analysis["price"]:,.2f}</div><div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div></div>', unsafe_allow_html=True)
         elif 1 <= score < 4:
-            st.markdown(f"""
-                <div class="card-weak-buy">
-                    <div style="color: #FF7E36; font-weight: 700;">📈 종합점수: +{score}점 [약세 속 반등 / 분할 접근]</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #FF7E36;">현재가: {currency}{analysis['price']:,.2f}</div>
-                    <div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="card-weak-buy"><div style="color: #FF7E36; font-weight: 700;">📈 종합점수: +{score}점 [약세 속 반등 / 분할 접근]</div><div style="font-size: 24px; font-weight: 800; color: #FF7E36;">현재가: {currency}{analysis["price"]:,.2f}</div><div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div></div>', unsafe_allow_html=True)
         elif score <= -4:
-            st.markdown(f"""
-                <div class="card-sell">
-                    <div style="color: #3182F6; font-weight: 700;">🚨 종합점수: {score}점 [강력 매도 / 하락 추세]</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #3182F6;">현재가: {currency}{analysis['price']:,.2f}</div>
-                    <div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="card-sell"><div style="color: #3182F6; font-weight: 700;">🚨 종합점수: {score}점 [강력 매도 / 하락 추세]</div><div style="font-size: 24px; font-weight: 800; color: #3182F6;">현재가: {currency}{analysis["price"]:,.2f}</div><div style="font-size: 14px; margin-top: 10px;">{reasons_html}</div></div>', unsafe_allow_html=True)
         else:
-            st.markdown(f"""
-                <div class="card-hold">
-                    <div style="color: #8E8E93; font-weight: 700;">⚪ 종합점수: {score}점 [관망 및 비중 축소]</div>
-                    <div style="font-size: 24px; font-weight: 800;">현재가: {currency}{analysis['price']:,.2f}</div>
-                    <div style="font-size: 14px; color: #8E8E93; margin-top: 10px;">{reasons_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="card-hold"><div style="color: #8E8E93; font-weight: 700;">⚪ 종합점수: {score}점 [관망 및 비중 축소]</div><div style="font-size: 24px; font-weight: 800;">현재가: {currency}{analysis["price"]:,.2f}</div><div style="font-size: 14px; color: #8E8E93; margin-top: 10px;">{reasons_html}</div></div>', unsafe_allow_html=True)
 
-    tradingview_html = f"""
-    <div class="tradingview-widget-container" style="height:100%;width:100%;">
-      <div id="tradingview_chart" style="height:650px;width:100%;"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
-      new TradingView.widget({{
-        "autosize": true,
-        "symbol": "{tv_symbol}",
-        "interval": "{tv_interval}",
-        "timezone": "Asia/Seoul",
-        "theme": "dark",
-        "style": "1",
-        "locale": "kr",
-        "toolbar_bg": "#101012",
-        "enable_publishing": false,
-        "hide_side_toolbar": true,
-        "allow_symbol_change": true,
-        "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies", "Volume@tv-basicstudies", "MACD@tv-basicstudies"],
-        "container_id": "tradingview_chart"
-      }});
-      </script>
-    </div>
-    """
-    components.html(tradingview_html, height=660)
+    # -------------------------------------------------------------------------
+    # 🌟 모바일 호환 내장 차트 (한국 주식: Streamlit 기본 라인차트 / 미국 주식: 트레이딩뷰)
+    # -------------------------------------------------------------------------
+    if is_korean_stock and not df.empty:
+        st.markdown(f"**{stock_input} 실시간 가격 추이 (한국 시장 전용)**")
+        # Streamlit 내장 차트 기능 사용 (설치 필요 없음)
+        st.line_chart(df['Close'])
+
+    else:
+        # 미국 주식은 기존 트레이딩뷰 위젯 사용
+        tradingview_html = f"""
+        <div class="tradingview-widget-container" style="height:100%;width:100%;">
+          <div id="tradingview_chart" style="height:650px;width:100%;"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+          new TradingView.widget({{
+            "autosize": true,
+            "symbol": "{tv_symbol}",
+            "interval": "{tv_interval}",
+            "timezone": "Asia/Seoul",
+            "theme": "dark",
+            "style": "1",
+            "locale": "kr",
+            "toolbar_bg": "#101012",
+            "enable_publishing": false,
+            "hide_side_toolbar": true,
+            "allow_symbol_change": true,
+            "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies", "Volume@tv-basicstudies", "MACD@tv-basicstudies"],
+            "container_id": "tradingview_chart"
+          }});
+          </script>
+        </div>
+        """
+        components.html(tradingview_html, height=660)
