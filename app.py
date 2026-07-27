@@ -7,7 +7,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 # -----------------------------------------------------------------------------
-# 1. 레이아웃 & 다크 테마 설정
+# 1. 레이아웃 & 가로 여백 완전히 제거 (화면 꽉 채우기)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="PRO 실시간 단타 대시보드",
@@ -16,9 +16,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Streamlit 기본 좌우 여백을 0으로 만들어 가로 폭을 극대화하는 CSS
 st.markdown("""
     <style>
+    /* 전체 화면 배경 */
     .stApp { background-color: #101012; color: #FFFFFF; }
+    
+    /* 좌우여백 완전히 제거하여 가로 폭 100% 활용 */
+    .block-container {
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+        padding-top: 1rem !important;
+        max-width: 100% !important;
+    }
     
     .signal-card-buy {
         background-color: rgba(240, 68, 82, 0.15);
@@ -186,7 +196,7 @@ if not df.empty and len(df) > 15:
                 <div style="font-size: 24px; font-weight: 800; color: #3182F6; margin-top: 4px;">지금은 [매도] 및 [진입 금지]!</div>
                 <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
                     • <b>이유:</b> 단기 과열 구간(RSI {curr_rsi:.1f})이거나 이평선이 하락세로 꺾였습니다.<br>
-                    • <b>대응:</b> 보유 중이라면 분할 매도로 수익 확정, 미보유자는 눌림목까지 대기하세요.
+                    • <b>대응:</b> 보유 중이라면 분할 매드로 수익 확정, 미보유자는 눌림목까지 대기하세요.
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -203,11 +213,11 @@ if not df.empty and len(df) > 15:
         """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 5. 트레이딩뷰 실시간 차트
+# 5. 트레이딩뷰 차트 (가로 폭 100% + 높이 750px 최적화)
 # -----------------------------------------------------------------------------
 tradingview_html = f"""
-<div class="tradingview-widget-container" style="height:100%;width:100%">
-  <div id="tradingview_chart" style="height:680px;width:100%"></div>
+<div class="tradingview-widget-container" style="height:100%;width:100%;margin:0;padding:0;">
+  <div id="tradingview_chart" style="height:750px;width:100%;"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({{
@@ -233,7 +243,7 @@ tradingview_html = f"""
 </div>
 """
 
-components.html(tradingview_html, height=690)
+components.html(tradingview_html, height=760)
 
 # -----------------------------------------------------------------------------
 # 6. 한글 뉴스 리스트
