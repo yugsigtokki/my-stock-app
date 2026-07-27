@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import urllib.request
+import urllib.parse
 import xml.etree.ElementTree as ET
 
 # -----------------------------------------------------------------------------
@@ -56,7 +57,6 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 def get_korean_news(query):
     try:
-        # 구글 뉴스 한국어 버전 및 키워드 검색
         encoded_query = urllib.parse.quote(f"{query} 주식")
         url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ko&gl=KR&ceid=KR:ko"
         
@@ -71,7 +71,6 @@ def get_korean_news(query):
             link = item.find('link').text if item.find('link') is not None else ""
             pub_date = item.find('pubDate').text[:16] if item.find('pubDate') is not None else ""
             
-            # 언론사 이름 정리 (예: "제목 - 연합뉴스" -> 제목만 추출)
             if " - " in title:
                 title_parts = title.rsplit(" - ", 1)
                 title = title_parts[0]
@@ -85,17 +84,44 @@ def get_korean_news(query):
         return []
 
 # -----------------------------------------------------------------------------
-# 3. 사이드바 - 종목 입력
+# 3. 🔥 화면 상단 대형 종목 검색창 & 빠른 원터치 버튼
 # -----------------------------------------------------------------------------
-st.sidebar.title("⚡ 종목 검색")
-stock_input = st.sidebar.text_input("티커 입력 (예: TSLL, NVDA, AAPL)", value="TSLL").strip().upper()
+st.markdown("### 🔍 종목 검색")
 
+# 기본 검색 세션 상태 저장
+if 'current_symbol' not in st.session_state:
+    st.session_state.current_symbol = "TSLL"
+
+# 메인 화면에 검색창 노출
+user_input = st.text_input(
+    "티커(종목코드) 입력 (예: TSLL, NVDA, AAPL, TSLA, 005930)", 
+    value=st.session_state.current_symbol,
+    key="search_input"
+).strip().upper()
+
+if user_input:
+    st.session_state.current_symbol = user_input
+
+# 인기 종목 원터치 버튼
+st.write("🔥 인기 검색 종목:")
+col1, col2, col3, col4, col5 = st.columns(5)
+if col1.button("TSLL (테슬라2X)"): st.session_state.current_symbol = "TSLL"; st.rerun()
+if col2.button("NVDA (엔비디아)"): st.session_state.current_symbol = "NVDA"; st.rerun()
+if col3.button("TSLA (테슬라)"): st.session_state.current_symbol = "TSLA"; st.rerun()
+if col4.button("AAPL (애플)"): st.session_state.current_symbol = "AAPL"; st.rerun()
+if col5.button("005930 (삼성)"): st.session_state.current_symbol = "005930"; st.rerun()
+
+stock_input = st.session_state.current_symbol
+
+# 심볼 변환 (미국주식 / 한국주식 자동 구분)
 if stock_input.isdigit() and len(stock_input) == 6:
     tv_symbol = f"KRX:{stock_input}"
     yf_symbol = f"{stock_input}.KS"
 else:
     tv_symbol = stock_input
     yf_symbol = stock_input
+
+st.markdown("---")
 
 # -----------------------------------------------------------------------------
 # 4. 🔥 AI 매수/매도 타이밍 실시간 가이드
@@ -112,7 +138,7 @@ def analyze_data(symbol):
 
 df = analyze_data(yf_symbol)
 
-st.markdown(f"# **{stock_input}**")
+st.markdown(f"# **{stock_input}** 분석 결과")
 
 if not df.empty and len(df) > 15:
     df['MA5'] = df['Close'].rolling(5).mean()
@@ -175,7 +201,7 @@ if not df.empty and len(df) > 15:
         """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 5. 트레이딩뷰 차트 (확대 + 깔끔한 UI)
+# 5. 트레이딩뷰 차트 (확대 + 종목 입력 바로 반영)
 # -----------------------------------------------------------------------------
 tradingview_html = f"""
 <div class="tradingview-widget-container" style="height:100%;width:100%">
