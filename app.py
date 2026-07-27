@@ -2,102 +2,66 @@ import streamlit as st
 import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 
 # -----------------------------------------------------------------------------
-# 1. 프리미엄 다크 터미널 UI 디스플레이 설정
+# 1. 레이아웃 & 다크 테마 설정
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="ALPHA QUANT PRO - AI 트레이딩 시스템",
-    page_icon="🔮",
+    page_title="PRO 실시간 단타 대시보드",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 st.markdown("""
     <style>
-    /* 고급스러운 블랙/다크 메탈 베이스 */
-    .stApp { background-color: #0B0E14; color: #E1E6ED; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .stApp { background-color: #101012; color: #FFFFFF; }
     
-    /* 헤더 & 카드 스타일링 */
-    .quant-header {
-        background: linear-gradient(135deg, #131B2A 0%, #0B0E14 100%);
-        padding: 20px 24px;
+    .signal-card-buy {
+        background-color: rgba(240, 68, 82, 0.15);
+        border: 2px solid #F04452;
+        padding: 20px;
         border-radius: 16px;
-        border: 1px solid #1E293B;
-        margin-bottom: 20px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        margin-bottom: 15px;
+    }
+    .signal-card-sell {
+        background-color: rgba(49, 130, 246, 0.15);
+        border: 2px solid #3182F6;
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 15px;
+    }
+    .signal-card-hold {
+        background-color: #1C1C1E;
+        border: 1px solid #2C2C2E;
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 15px;
     }
     
-    .status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-    
-    /* 강렬한 AI 시그널 카드 */
-    .card-buy {
-        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
-        border: 1px solid #EF4444;
-        border-left: 6px solid #EF4444;
-        padding: 22px;
-        border-radius: 14px;
-        margin-bottom: 20px;
-    }
-    
-    .card-sell {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
-        border: 1px solid #3B82F6;
-        border-left: 6px solid #3B82F6;
-        padding: 22px;
-        border-radius: 14px;
-        margin-bottom: 20px;
-    }
-    
-    .card-neutral {
-        background: linear-gradient(135deg, rgba(100, 116, 139, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
-        border: 1px solid #64748B;
-        border-left: 6px solid #64748B;
-        padding: 22px;
-        border-radius: 14px;
-        margin-bottom: 20px;
-    }
-
-    .metric-box {
-        background: #151D2A;
-        border: 1px solid #1E293B;
-        padding: 14px;
-        border-radius: 10px;
-        text-align: center;
-    }
-
     .news-card {
-        background: #131B2A;
-        border: 1px solid #1E293B;
-        padding: 16px;
+        background-color: #1C1C1E;
+        padding: 14px 18px;
         border-radius: 12px;
         margin-bottom: 10px;
-        transition: all 0.2s ease;
+        border: 1px solid #2C2C2E;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. 한글 뉴스 알고리즘 함수
+# 2. 한글 뉴스 수집 함수
 # -----------------------------------------------------------------------------
-def fetch_korean_news(query):
+def get_korean_news(query):
     try:
-        encoded_query = urllib.parse.quote(f"{query} 주식 속보")
+        encoded_query = urllib.parse.quote(f"{query} 주식")
         url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ko&gl=KR&ceid=KR:ko"
         
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        xml_data = urllib.request.urlopen(req, timeout=3).read()
+        xml_data = urllib.request.urlopen(req, timeout=4).read()
         root = ET.fromstring(xml_data)
         
         items = root.findall('./channel/item')[:5]
@@ -108,10 +72,11 @@ def fetch_korean_news(query):
             pub_date = item.find('pubDate').text[:16] if item.find('pubDate') is not None else ""
             
             if " - " in title:
-                parts = title.rsplit(" - ", 1)
-                title, source = parts[0], parts[1]
+                title_parts = title.rsplit(" - ", 1)
+                title = title_parts[0]
+                source = title_parts[1]
             else:
-                source = "실시간 속보"
+                source = "뉴스"
 
             news_list.append({"title": title, "link": link, "date": pub_date, "source": source})
         return news_list
@@ -119,6 +84,174 @@ def fetch_korean_news(query):
         return []
 
 # -----------------------------------------------------------------------------
-# 3. 메인 트레이딩 터미널 헤더 & 종목 검색
+# 3. 화면 상단 종목 검색 및 터치 버튼
 # -----------------------------------------------------------------------------
-if 'current_symbol'
+st.markdown("### 🔍 종목 검색")
+
+if "current_symbol" not in st.session_state:
+    st.session_state["current_symbol"] = "TSLL"
+
+user_input = st.text_input(
+    "티커 입력 (예: TSLL, NVDA, AAPL, TSLA, 005930)", 
+    value=st.session_state["current_symbol"]
+).strip().upper()
+
+if user_input:
+    st.session_state["current_symbol"] = user_input
+
+st.write("🔥 인기 검색 종목:")
+col1, col2, col3, col4, col5 = st.columns(5)
+if col1.button("TSLL (테슬라2X)"): 
+    st.session_state["current_symbol"] = "TSLL"
+    st.rerun()
+if col2.button("NVDA (엔비디아)"): 
+    st.session_state["current_symbol"] = "NVDA"
+    st.rerun()
+if col3.button("TSLA (테슬라)"): 
+    st.session_state["current_symbol"] = "TSLA"
+    st.rerun()
+if col4.button("AAPL (애플)"): 
+    st.session_state["current_symbol"] = "AAPL"
+    st.rerun()
+if col5.button("005930 (삼성)"): 
+    st.session_state["current_symbol"] = "005930"
+    st.rerun()
+
+stock_input = st.session_state["current_symbol"]
+
+if stock_input.isdigit() and len(stock_input) == 6:
+    tv_symbol = f"KRX:{stock_input}"
+    yf_symbol = f"{stock_input}.KS"
+else:
+    tv_symbol = stock_input
+    yf_symbol = stock_input
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 4. AI 매수/매도 타이밍 실시간 가이드
+# -----------------------------------------------------------------------------
+@st.cache_data(ttl=5)
+def analyze_data(symbol):
+    try:
+        df = yf.download(symbol, period="1d", interval="1m")
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        return df
+    except:
+        return pd.DataFrame()
+
+df = analyze_data(yf_symbol)
+
+st.markdown(f"# **{stock_input}** 분석 결과")
+
+if not df.empty and len(df) > 15:
+    df['MA5'] = df['Close'].rolling(5).mean()
+    df['MA20'] = df['Close'].rolling(20).mean()
+    
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    latest = df.iloc[-1]
+    prev = df.iloc[-2]
+    
+    curr_price = float(latest['Close'])
+    curr_rsi = float(latest['RSI']) if not pd.isna(latest['RSI']) else 50.0
+    ma5 = float(latest['MA5'])
+    ma20 = float(latest['MA20'])
+    
+    is_golden_cross = (float(prev['MA5']) <= float(prev['MA20'])) and (ma5 > ma20)
+    is_dead_cross = (float(prev['MA5']) >= float(prev['MA20'])) and (ma5 < ma20)
+    
+    if (ma5 > ma20 or is_golden_cross) and curr_rsi <= 50:
+        st.markdown(f"""
+            <div class="signal-card-buy">
+                <div style="color: #F04452; font-size: 14px; font-weight: 700;">🚨 AI 단타 매수 타이밍</div>
+                <div style="font-size: 24px; font-weight: 800; color: #F04452; margin-top: 4px;">지금 바로 [매수] 고려 구간!</div>
+                <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
+                    • <b>이유:</b> 5분/1분 이평선 우상향 전환 및 단기 저점(RSI {curr_rsi:.1f}) 형성<br>
+                    • <b>목표가:</b> ${curr_price * 1.015:,.2f} (+1.5% 익절)<br>
+                    • <b>손절가:</b> ${curr_price * 0.99:,.2f} (-1.0% 이탈시 즉시 손절)
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    elif (ma5 < ma20 or is_dead_cross) or curr_rsi >= 65:
+        st.markdown(f"""
+            <div class="signal-card-sell">
+                <div style="color: #3182F6; font-size: 14px; font-weight: 700;">⚠️ AI 단타 매도/관망 타이밍</div>
+                <div style="font-size: 24px; font-weight: 800; color: #3182F6; margin-top: 4px;">지금은 [매도] 및 [진입 금지]!</div>
+                <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
+                    • <b>이유:</b> 단기 과열 구간(RSI {curr_rsi:.1f})이거나 이평선이 하락세로 꺾였습니다.<br>
+                    • <b>대응:</b> 보유 중이라면 분할 매도로 수익 확정, 미보유자는 눌림목까지 대기하세요.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    else:
+        st.markdown(f"""
+            <div class="signal-card-hold">
+                <div style="color: #8E8E93; font-size: 14px; font-weight: 700;">⚪ AI 단타 관망 구간</div>
+                <div style="font-size: 22px; font-weight: 800; color: #FFFFFF; margin-top: 4px;">보유자는 유지 / 신규진입은 관망</div>
+                <div style="font-size: 14px; color: #8E8E93; margin-top: 6px;">
+                    현재 박스권 횡보 중입니다. 확실한 신호(골든크로스/과매도)가 나올 때까지 대기하세요.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 5. 트레이딩뷰 실시간 차트
+# -----------------------------------------------------------------------------
+tradingview_html = f"""
+<div class="tradingview-widget-container" style="height:100%;width:100%">
+  <div id="tradingview_chart" style="height:680px;width:100%"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script type="text/javascript">
+  new TradingView.widget({{
+    "autosize": true,
+    "symbol": "{tv_symbol}",
+    "interval": "1",
+    "timezone": "Asia/Seoul",
+    "theme": "dark",
+    "style": "1",
+    "locale": "kr",
+    "toolbar_bg": "#101012",
+    "enable_publishing": false,
+    "hide_side_toolbar": true,
+    "allow_symbol_change": true,
+    "studies": [
+      "MASimple@tv-basicstudies",
+      "RSI@tv-basicstudies",
+      "Volume@tv-basicstudies"
+    ],
+    "container_id": "tradingview_chart"
+  }});
+  </script>
+</div>
+"""
+
+components.html(tradingview_html, height=690)
+
+# -----------------------------------------------------------------------------
+# 6. 한글 뉴스 리스트
+# -----------------------------------------------------------------------------
+st.markdown("### 📰 한글 주요 뉴스 & 속보")
+news_data = get_korean_news(stock_input)
+
+if news_data:
+    for news in news_data:
+        st.markdown(f"""
+            <div class="news-card">
+                <a href="{news['link']}" target="_blank" style="text-decoration: none; color: #FFFFFF; font-weight: 600; font-size: 15px;">
+                    • {news['title']}
+                </a>
+                <div style="color: #8E8E93; font-size: 12px; margin-top: 4px;">
+                    {news['source']} | {news['date']}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+else:
+    st.write("관련 최신 한글 뉴스를 찾는 중입니다...")
