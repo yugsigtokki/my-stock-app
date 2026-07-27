@@ -24,7 +24,7 @@ st.markdown("""
     .header-box {
         background: linear-gradient(135deg, #1e222d 0%, #12161c 100%);
         border: 1px solid #2a2e39;
-        padding: 15px 20px;
+        padding: 12px 18px;
         border-radius: 12px;
         margin-bottom: 10px;
         display: flex;
@@ -35,18 +35,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (종목 저장)
+# 2. 세션 상태 초기화
 # -----------------------------------------------------------------------------
 if "symbol" not in st.session_state:
     st.session_state["symbol"] = "TSLA"
 
 # -----------------------------------------------------------------------------
-# 3. 상단 컨트롤 패널 (종목 변경 및 타임프레임 선택)
+# 3. 상단 컨트롤 패널
 # -----------------------------------------------------------------------------
 st.markdown("""
     <div class="header-box">
-        <h3 style="margin:0; color:#00ffcc;">⚡ ULTRA REALTIME TRADING DESK</h3>
-        <span style="color:#848e9c; font-size:14px;">데이터 지연 없는 트레이딩뷰 실시간 엔진 연동 완료</span>
+        <h4 style="margin:0; color:#00ffcc;">⚡ ULTRA REALTIME TRADING DESK</h4>
+        <span style="color:#848e9c; font-size:13px;">실시간 엔진 연동 완료</span>
     </div>
 """, unsafe_allow_html=True)
 
@@ -58,10 +58,9 @@ with col_input:
         st.session_state["symbol"] = user_symbol
 
 with col_time:
-    # 트레이딩뷰 전용 타임프레임 코드
     timeframe_mode = st.radio(
         "실시간 차트 주기", 
-        ["1분봉 (스캘핑)", "5분봉 (단타)", "1시간봉", "일봉 (스윙)"], 
+        ["1분봉", "5분봉", "1시간봉", "일봉"], 
         horizontal=True
     )
 
@@ -81,7 +80,7 @@ tv_symbol = f"BATS:{target_ticker}"
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 4. 100% 실시간 트레이딩뷰 차트 임베드 (딜레이 없음)
+# 4. 트레이딩뷰 위젯 (왼쪽 선 긋기 툴바 완전 숨김 처리 적용)
 # -----------------------------------------------------------------------------
 tradingview_html = f"""
 <!DOCTYPE html>
@@ -114,11 +113,11 @@ tradingview_html = f"""
       "locale": "kr",
       "toolbar_bg": "#12161c",
       "enable_publishing": false,
-      "hide_side_toolbar": false,
+      "hide_side_toolbar": true,      // <-- 이 옵션이 왼쪽 선 긋기 툴바를 완전히 숨깁니다!
       "allow_symbol_change": false,
-      "details": true,
-      "hotlist": true,
-      "calendar": true,
+      "details": false,
+      "hotlist": false,
+      "calendar": false,
       "studies": [
         "MASimple@tv-basicstudies",
         "RSI@tv-basicstudies",
@@ -133,5 +132,4 @@ tradingview_html = f"""
 </html>
 """
 
-# 모바일 화면 높이에 맞게 꽉 채움
 components.html(tradingview_html, height=720)
