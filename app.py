@@ -16,13 +16,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Streamlit 기본 좌우 여백을 0으로 만들어 가로 폭을 극대화하는 CSS
 st.markdown("""
     <style>
-    /* 전체 화면 배경 */
     .stApp { background-color: #101012; color: #FFFFFF; }
     
-    /* 좌우여백 완전히 제거하여 가로 폭 100% 활용 */
     .block-container {
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
@@ -30,24 +27,39 @@ st.markdown("""
         max-width: 100% !important;
     }
     
-    .signal-card-buy {
-        background-color: rgba(240, 68, 82, 0.15);
+    /* 5단계 신호 카드 스타일 */
+    .signal-card-strong-buy {
+        background-color: rgba(240, 68, 82, 0.25);
         border: 2px solid #F04452;
-        padding: 20px;
+        padding: 18px;
         border-radius: 16px;
         margin-bottom: 15px;
     }
-    .signal-card-sell {
-        background-color: rgba(49, 130, 246, 0.15);
-        border: 2px solid #3182F6;
-        padding: 20px;
+    .signal-card-buy {
+        background-color: rgba(255, 126, 54, 0.2);
+        border: 2px solid #FF7E36;
+        padding: 18px;
         border-radius: 16px;
         margin-bottom: 15px;
     }
     .signal-card-hold {
         background-color: #1C1C1E;
         border: 1px solid #2C2C2E;
-        padding: 20px;
+        padding: 18px;
+        border-radius: 16px;
+        margin-bottom: 15px;
+    }
+    .signal-card-sell {
+        background-color: rgba(49, 130, 246, 0.2);
+        border: 2px solid #3182F6;
+        padding: 18px;
+        border-radius: 16px;
+        margin-bottom: 15px;
+    }
+    .signal-card-strong-sell {
+        background-color: rgba(0, 81, 255, 0.3);
+        border: 2px solid #0051FF;
+        padding: 18px;
         border-radius: 16px;
         margin-bottom: 15px;
     }
@@ -129,17 +141,18 @@ if col5.button("005930 (삼성)"):
 
 stock_input = st.session_state["current_symbol"]
 
+# 실시간 BATS 피드 연결 (미국 주식 지연 방지)
 if stock_input.isdigit() and len(stock_input) == 6:
     tv_symbol = f"KRX:{stock_input}"
     yf_symbol = f"{stock_input}.KS"
 else:
-    tv_symbol = stock_input
+    tv_symbol = f"BATS:{stock_input}"
     yf_symbol = stock_input
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 4. AI 매수/매도 타이밍 실시간 가이드
+# 4. 🔥 세분화된 5단계 AI 매수/매도 타이밍 가이드
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=5)
 def analyze_data(symbol):
@@ -176,44 +189,73 @@ if not df.empty and len(df) > 15:
     is_golden_cross = (float(prev['MA5']) <= float(prev['MA20'])) and (ma5 > ma20)
     is_dead_cross = (float(prev['MA5']) >= float(prev['MA20'])) and (ma5 < ma20)
     
-    if (ma5 > ma20 or is_golden_cross) and curr_rsi <= 50:
+    # 1. 🚀 강한 매수
+    if is_golden_cross or (ma5 > ma20 and curr_rsi <= 40):
+        st.markdown(f"""
+            <div class="signal-card-strong-buy">
+                <div style="color: #F04452; font-size: 14px; font-weight: 700;">🔥 AI 단타 신호: [강한 매수]</div>
+                <div style="font-size: 24px; font-weight: 800; color: #F04452; margin-top: 4px;">🚀 지금 강력 진입 추천 구간!</div>
+                <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
+                    • <b>판단 이유:</b> 골든크로스 발생 또는 극심한 과매도 구간(RSI {curr_rsi:.1f}) 반등<br>
+                    • <b>목표가:</b> ${curr_price * 1.02:,.2f} (+2.0% 익절)<br>
+                    • <b>손절가:</b> ${curr_price * 0.992:,.2f} (-0.8% 손절)
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    # 2. 📈 약한 매수 (눌림목 진입)
+    elif ma5 > ma20 and curr_rsi <= 52:
         st.markdown(f"""
             <div class="signal-card-buy">
-                <div style="color: #F04452; font-size: 14px; font-weight: 700;">🚨 AI 단타 매수 타이밍</div>
-                <div style="font-size: 24px; font-weight: 800; color: #F04452; margin-top: 4px;">지금 바로 [매수] 고려 구간!</div>
+                <div style="color: #FF7E36; font-size: 14px; font-weight: 700;">📈 AI 단타 신호: [약한 매수 / 분할 진입]</div>
+                <div style="font-size: 22px; font-weight: 800; color: #FF7E36; margin-top: 4px;">눌림목 구간 - 분할 매수 고려</div>
                 <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
-                    • <b>이유:</b> 5분/1분 이평선 우상향 전환 및 단기 저점(RSI {curr_rsi:.1f}) 형성<br>
-                    • <b>목표가:</b> ${curr_price * 1.015:,.2f} (+1.5% 익절)<br>
-                    • <b>손절가:</b> ${curr_price * 0.99:,.2f} (-1.0% 이탈시 즉시 손절)
+                    • <b>판단 이유:</b> 우상향 흐름 속 단기 정체(RSI {curr_rsi:.1f})로 분할 매수 적기<br>
+                    • <b>목표가:</b> ${curr_price * 1.012:,.2f} (+1.2% 익절)<br>
+                    • <b>손절가:</b> ${curr_price * 0.99:,.2f} (-1.0% 손절)
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        
-    elif (ma5 < ma20 or is_dead_cross) or curr_rsi >= 65:
+
+    # 3. 🚨 강한 매도
+    elif is_dead_cross or (ma5 < ma20 and curr_rsi >= 68):
+        st.markdown(f"""
+            <div class="signal-card-strong-sell">
+                <div style="color: #3182F6; font-size: 14px; font-weight: 700;">🚨 AI 단타 신호: [강한 매도 / 즉시 탈출]</div>
+                <div style="font-size: 24px; font-weight: 800; color: #3182F6; margin-top: 4px;">⚠️ 전량 매도 및 진입 엄금!</div>
+                <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
+                    • <b>판단 이유:</b> 데드크로스 연출 또는 단기 과열(RSI {curr_rsi:.1f}) 심화<br>
+                    • <b>대응:</b> 즉시 수익/손실 확정 후 눌림목 형성까지 완전히 대기
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # 4. 📉 약한 매도 (수익 실현 준비)
+    elif ma5 < ma20 or curr_rsi >= 60:
         st.markdown(f"""
             <div class="signal-card-sell">
-                <div style="color: #3182F6; font-size: 14px; font-weight: 700;">⚠️ AI 단타 매도/관망 타이밍</div>
-                <div style="font-size: 24px; font-weight: 800; color: #3182F6; margin-top: 4px;">지금은 [매도] 및 [진입 금지]!</div>
+                <div style="color: #60A5FA; font-size: 14px; font-weight: 700;">📉 AI 단타 신호: [약한 매도 / 비중 축소]</div>
+                <div style="font-size: 22px; font-weight: 800; color: #60A5FA; margin-top: 4px;">상승세 둔화 - 분할 매도 구간</div>
                 <div style="font-size: 14px; color: #E5E5EA; margin-top: 8px;">
-                    • <b>이유:</b> 단기 과열 구간(RSI {curr_rsi:.1f})이거나 이평선이 하락세로 꺾였습니다.<br>
-                    • <b>대응:</b> 보유 중이라면 분할 매드로 수익 확정, 미보유자는 눌림목까지 대기하세요.
+                    • <b>판단 이유:</b> 단기 이평선 하락 전환(RSI {curr_rsi:.1f}), 수익 일부 확정 권장
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
+    # 5. ⚪ 관망
     else:
         st.markdown(f"""
             <div class="signal-card-hold">
-                <div style="color: #8E8E93; font-size: 14px; font-weight: 700;">⚪ AI 단타 관망 구간</div>
-                <div style="font-size: 22px; font-weight: 800; color: #FFFFFF; margin-top: 4px;">보유자는 유지 / 신규진입은 관망</div>
+                <div style="color: #8E8E93; font-size: 14px; font-weight: 700;">⚪ AI 단타 신호: [관망]</div>
+                <div style="font-size: 22px; font-weight: 800; color: #FFFFFF; margin-top: 4px;">보유자는 유지 / 신규진입 대기</div>
                 <div style="font-size: 14px; color: #8E8E93; margin-top: 6px;">
-                    현재 박스권 횡보 중입니다. 확실한 신호(골든크로스/과매도)가 나올 때까지 대기하세요.
+                    현재 박스권 흐름 중입니다. 명확한 돌파나 눌림 신호가 나올 때까지 대기하세요.
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 5. 트레이딩뷰 차트 (가로 폭 100% + 높이 750px 최적화)
+# 5. 트레이딩뷰 실시간 차트 (Cboe BATS 실시간 데이터 연동)
 # -----------------------------------------------------------------------------
 tradingview_html = f"""
 <div class="tradingview-widget-container" style="height:100%;width:100%;margin:0;padding:0;">
